@@ -6,7 +6,7 @@ import tempfile
 import os
 
 # ==============================
-# Configuration UI (design)
+# Configuration UI
 # ==============================
 st.set_page_config(
     page_title="Détection Poubelle Pleine/Vide",
@@ -15,7 +15,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS pour embellir l'UI
+# ==============================
+# CSS
+# ==============================
 st.markdown("""
     <style>
         .title {
@@ -29,16 +31,6 @@ st.markdown("""
             font-size: 20px;
             margin-bottom: 15px;
         }
-        .stButton>button {
-            background-color: #4CAF50 !important;
-            color: white !important;
-            border-radius: 10px !important;
-            padding: 10px 20px !important;
-            font-size: 16px !important;
-        }
-        .stButton>button:hover {
-            background-color: #45a049 !important;
-        }
         .box {
             padding: 15px;
             background-color: #f9f9f9;
@@ -50,16 +42,16 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================
-# Charger modèle
+# Charger modèle YOLO
 # ==============================
 model_path = "best.pt"
 model = YOLO(model_path)
 
 # ==============================
-# Interface Streamlit
+# UI principale
 # ==============================
 st.markdown("<h1 class='title'>🗑️ Détection Poubelle Pleine / Vide</h1>", unsafe_allow_html=True)
-st.markdown("<p class='subtitle'>Analyse intelligente d’images et de vidéos avec YOLOv8</p>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Analyse d’images et de vidéos avec YOLOv8</p>", unsafe_allow_html=True)
 
 mode = st.radio("🎛️ Choisir le mode :", ["Image", "Vidéo"])
 
@@ -68,24 +60,23 @@ mode = st.radio("🎛️ Choisir le mode :", ["Image", "Vidéo"])
 # ==============================
 if mode == "Image":
     uploaded_file = st.file_uploader("📥 Importer une image", type=["jpg", "jpeg", "png"])
-    if uploaded_file is not None:
 
+    if uploaded_file is not None:
         st.markdown("<div class='box'>📷 Image originale</div>", unsafe_allow_html=True)
         img = Image.open(uploaded_file)
         st.image(img, use_column_width=True)
 
-        # Prédiction
-        with st.spinner("🔍 Analyse de l'image en cours..."):
+        with st.spinner("🔍 Analyse en cours..."):
             results = model.predict(img)
 
-        # Labels détectés
         detected_labels = []
+
         for box in results[0].boxes:
             cls = int(box.cls[0])
             label = results[0].names[cls]
             detected_labels.append(label)
 
-        st.subheader("📝 Résultats de la prédiction")
+        st.subheader("📝 Résultats")
 
         if len(detected_labels) == 0:
             st.error("❌ Aucune poubelle détectée")
@@ -98,39 +89,38 @@ if mode == "Image":
                 else:
                     st.info(f"Objet détecté : {label}")
 
-        # Image annotée
         st.markdown("<div class='box'>🖼️ Image annotée</div>", unsafe_allow_html=True)
-        annotated_img = results[0].plot()
-        st.image(annotated_img, use_column_width=True)
+        st.image(results[0].plot(), use_column_width=True)
 
 # ==============================
-# MODE VIDÉO
+# MODE VIDEO
 # ==============================
 elif mode == "Vidéo":
+
     uploaded_video = st.file_uploader("📥 Importer une vidéo", type=["mp4", "avi", "mov"])
+    
     if uploaded_video:
 
-        st.markdown("<div class='box'>🎬 Vidéo originale</div>", unsafe_allow_html=True)
-
-        # Sauvegarde temporaire pour la vidéo uploadée
+        # 🔹 Sauvegarde de la vidéo uploadée dans un fichier temporaire
         tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         tfile.write(uploaded_video.read())
 
+        st.markdown("<div class='box'>🎬 Vidéo originale</div>", unsafe_allow_html=True)
         st.video(tfile.name)
 
         if st.button("🔍 Lancer la détection"):
-            with st.spinner("⏳ Analyse vidéo en cours... Cela peut prendre un moment..."):
+
+            with st.spinner("⏳ Analyse vidéo en cours..."):
 
                 cap = cv2.VideoCapture(tfile.name)
 
-                # IMPORTANT : chemin temporaire pour Streamlit Cloud
-                output_path = os.path.join(tempfile.gettempdir(), "output_detected.mp4")
+                # 🔹 IMPORTANT : Format compatible Streamlit Cloud
+                output_path = "output_detected.webm"
+                fourcc = cv2.VideoWriter_fourcc(*"VP90")  # codec VP9 pour WebM
 
-                # Codec compatible Streamlit Cloud
-                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 fps = cap.get(cv2.CAP_PROP_FPS)
-                width = int(cap.get(3))
-                height = int(cap.get(4))
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
                 out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
@@ -139,8 +129,9 @@ elif mode == "Vidéo":
                     if not ret:
                         break
 
-                    results = model(frame)  # YOLO inference
+                    results = model(frame)
                     annotated_frame = results[0].plot()
+
                     out.write(annotated_frame)
 
                 cap.release()
@@ -150,10 +141,15 @@ elif mode == "Vidéo":
 
             st.markdown("<div class='box'>🟩 Vidéo annotée</div>", unsafe_allow_html=True)
 
-            # Afficher la vidéo détectée
-            with open(output_path, "rb") as video_file:
-                st.video(video_file.read())
-
-            # Bouton de téléchargement
+            # 🔹 Affichage immédiat de la vidéo détectée
             with open(output_path, "rb") as f:
-                st.download_button("📥 Télécharger la vidéo annotée", f, file_name="video_detected.mp4")
+                st.video(f.read())
+
+            # 🔹 Téléchargement optionnel
+            with open(output_path, "rb") as f:
+                st.download_button(
+                    "📥 Télécharger la vidéo annotée",
+                    f,
+                    file_name="video_detected.webm",
+                    mime="video/webm"
+                )
