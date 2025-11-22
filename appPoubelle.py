@@ -30,14 +30,14 @@ st.markdown("""
             margin-bottom: 15px;
         }
         .stButton>button {
-            background-color: #4CAF50;
-            color: white;
-            border-radius: 10px;
-            padding: 10px 20px;
-            font-size: 16px;
+            background-color: #4CAF50 !important;
+            color: white !important;
+            border-radius: 10px !important;
+            padding: 10px 20px !important;
+            font-size: 16px !important;
         }
         .stButton>button:hover {
-            background-color: #45a049;
+            background-color: #45a049 !important;
         }
         .box {
             padding: 15px;
@@ -52,7 +52,6 @@ st.markdown("""
 # ==============================
 # Charger modèle
 # ==============================
-# model_path = r"C:\Users\hp\Desktop\master2\deep learning\projetIndividuel1\runs\detect\poubelle_yolov8\weights\best.pt"
 model_path = "best.pt"
 model = YOLO(model_path)
 
@@ -65,7 +64,7 @@ st.markdown("<p class='subtitle'>Analyse intelligente d’images et de vidéos a
 mode = st.radio("🎛️ Choisir le mode :", ["Image", "Vidéo"])
 
 # ==============================
-# Mode IMAGE
+# MODE IMAGE
 # ==============================
 if mode == "Image":
     uploaded_file = st.file_uploader("📥 Importer une image", type=["jpg", "jpeg", "png"])
@@ -105,7 +104,7 @@ if mode == "Image":
         st.image(annotated_img, use_column_width=True)
 
 # ==============================
-# Mode VIDEO
+# MODE VIDÉO
 # ==============================
 elif mode == "Vidéo":
     uploaded_video = st.file_uploader("📥 Importer une vidéo", type=["mp4", "avi", "mov"])
@@ -113,18 +112,22 @@ elif mode == "Vidéo":
 
         st.markdown("<div class='box'>🎬 Vidéo originale</div>", unsafe_allow_html=True)
 
-        # Sauvegarde temporaire
-        tfile = tempfile.NamedTemporaryFile(delete=False)
+        # Sauvegarde temporaire pour la vidéo uploadée
+        tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         tfile.write(uploaded_video.read())
 
         st.video(tfile.name)
 
         if st.button("🔍 Lancer la détection"):
             with st.spinner("⏳ Analyse vidéo en cours... Cela peut prendre un moment..."):
-                
+
                 cap = cv2.VideoCapture(tfile.name)
-                output_path = "output_detected.mp4"
-                fourcc = cv2.VideoWriter_fourcc(*"avc1")
+
+                # IMPORTANT : chemin temporaire pour Streamlit Cloud
+                output_path = os.path.join(tempfile.gettempdir(), "output_detected.mp4")
+
+                # Codec compatible Streamlit Cloud
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 fps = cap.get(cv2.CAP_PROP_FPS)
                 width = int(cap.get(3))
                 height = int(cap.get(4))
@@ -136,21 +139,21 @@ elif mode == "Vidéo":
                     if not ret:
                         break
 
-                    results = model(frame)
+                    results = model(frame)  # YOLO inference
                     annotated_frame = results[0].plot()
                     out.write(annotated_frame)
 
                 cap.release()
                 out.release()
-                #cv2.destroyAllWindows()
 
             st.success("🎉 Détection terminée !")
 
             st.markdown("<div class='box'>🟩 Vidéo annotée</div>", unsafe_allow_html=True)
 
+            # Afficher la vidéo détectée
             with open(output_path, "rb") as video_file:
                 st.video(video_file.read())
 
-            # Bouton téléchargement
+            # Bouton de téléchargement
             with open(output_path, "rb") as f:
                 st.download_button("📥 Télécharger la vidéo annotée", f, file_name="video_detected.mp4")
