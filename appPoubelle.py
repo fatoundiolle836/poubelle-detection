@@ -142,7 +142,7 @@ elif mode == "Vidéo":
 
                 cap.release()
                 out.release()
-                cv2.destroyAllWindows()
+              # cv2.destroyAllWindows()
 
             st.success("🎉 Détection terminée !")
 
