@@ -1,12 +1,8 @@
 streamlit
-ultralytics
-opencv-python-headless
+ultralytics==8.1.0
+opencv-python-headless==4.8.1.78
 numpy
 Pillow
 torch
 torchvision
 protobuf
-
-
-
-
