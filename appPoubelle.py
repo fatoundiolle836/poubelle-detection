@@ -112,35 +112,67 @@ elif mode == "Vidéo":
 
         st.markdown("<div class='box'>🎬 Vidéo originale</div>", unsafe_allow_html=True)
 
-        # Sauvegarde temporaire
-        tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-        tfile.write(uploaded_video.read())
+        # Sauvegarde du fichier source en temporaire
+        src_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+        src_tmp.write(uploaded_video.read())
+        src_tmp.flush()
+        src_path = src_tmp.name
 
-        st.video(tfile.name)
+        st.video(src_path)
 
         if st.button("🔍 Lancer la détection"):
             with st.spinner("⏳ Analyse vidéo en cours... Cela peut prendre un moment..."):
-                
-                cap = cv2.VideoCapture(tfile.name)
-                # Fichier temporaire pour la sortie
-                temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-                output_path = temp_output.name
+                cap = cv2.VideoCapture(src_path)
+                if not cap.isOpened():
+                    st.error("❌ Impossible d'ouvrir la vidéo source.")
+                    st.stop()
 
-                fourcc = cv2.VideoWriter_fourcc(*"avc1")
+                # Récupération des paramètres vidéo
                 fps = cap.get(cv2.CAP_PROP_FPS)
-                width = int(cap.get(3))
-                height = int(cap.get(4))
+                if fps is None or fps <= 0:
+                    fps = 24  # FPS par défaut si invalides
 
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                if width <= 0 or height <= 0:
+                    st.error("❌ Dimensions invalides pour la vidéo.")
+                    st.stop()
+
+                # Fichier de sortie temporaire
+                out_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+                output_path = out_tmp.name
+
+                # Essayer un codec compatible (mp4)
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
+                # Fallback si l'ouverture échoue (AVI MJPG)
+                if not out.isOpened():
+                    out.release()
+                    out_tmp.close()
+                    out_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".avi")
+                    output_path = out_tmp.name
+                    fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+                    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+                if not out.isOpened():
+                    st.error("❌ Échec de l'ouverture du fichier de sortie vidéo.")
+                    cap.release()
+                    st.stop()
+
+                # Traitement frame par frame
                 while True:
                     ret, frame = cap.read()
                     if not ret:
                         break
 
                     results = model(frame)
-                    annotated_frame = results[0].plot()
-                    out.write(annotated_frame)
+                    annotated = results[0].plot()
+
+                    if annotated.shape[1] != width or annotated.shape[0] != height:
+                        annotated = cv2.resize(annotated, (width, height))
+
+                    out.write(annotated)
 
                 cap.release()
                 out.release()
@@ -149,9 +181,12 @@ elif mode == "Vidéo":
 
             st.markdown("<div class='box'>🟩 Vidéo annotée</div>", unsafe_allow_html=True)
 
-            with open(output_path, "rb") as video_file:
-                st.video(video_file.read())
+            with open(output_path, "rb") as vf:
+                video_bytes = vf.read()
 
-            # Bouton téléchargement
-            with open(output_path, "rb") as f:
-                st.download_button("📥 Télécharger la vidéo annotée", f, file_name="video_detected.mp4")
+            if len(video_bytes) == 0:
+                st.error("❌ La vidéo générée est vide. Réessaie avec une autre vidéo.")
+            else:
+                st.video(video_bytes)
+                st.download_button("📥 Télécharger la vidéo annotée", data=video_bytes,
+                                   file_name=os.path.basename(output_path), mime="video/mp4")
