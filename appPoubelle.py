@@ -1,6 +1,7 @@
 import streamlit as st
 from ultralytics import YOLO
 from PIL import Image
+import numpy as np
 import cv2
 import tempfile
 import os
@@ -52,8 +53,7 @@ st.markdown("""
 # ==============================
 # Charger modèle
 # ==============================
-# model_path = r"C:\Users\hp\Desktop\master2\deep learning\projetIndividuel1\runs\detect\poubelle_yolov8\weights\best.pt"
-model_path = "best.pt"
+model_path = "best.pt"   # Assure-toi qu'il est bien dans ton repo GitHub
 model = YOLO(model_path)
 
 # ==============================
@@ -75,11 +75,11 @@ if mode == "Image":
         img = Image.open(uploaded_file)
         st.image(img, use_column_width=True)
 
-        # Prédiction
+        # Prédiction (CORRIGÉE)
         with st.spinner("🔍 Analyse de l'image en cours..."):
-            results = model.predict(img)
+            img_np = np.array(img)
+            results = model.predict(img_np)
 
-        # Labels détectés
         detected_labels = []
         for box in results[0].boxes:
             cls = int(box.cls[0])
@@ -113,18 +113,17 @@ elif mode == "Vidéo":
 
         st.markdown("<div class='box'>🎬 Vidéo originale</div>", unsafe_allow_html=True)
 
-        # Sauvegarde temporaire
         tfile = tempfile.NamedTemporaryFile(delete=False)
         tfile.write(uploaded_video.read())
-
         st.video(tfile.name)
 
         if st.button("🔍 Lancer la détection"):
             with st.spinner("⏳ Analyse vidéo en cours... Cela peut prendre un moment..."):
-                
+
                 cap = cv2.VideoCapture(tfile.name)
                 output_path = "output_detected.mp4"
-                fourcc = cv2.VideoWriter_fourcc(*"avc1")
+
+                fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                 fps = cap.get(cv2.CAP_PROP_FPS)
                 width = int(cap.get(3))
                 height = int(cap.get(4))
@@ -142,7 +141,6 @@ elif mode == "Vidéo":
 
                 cap.release()
                 out.release()
-                cv2.destroyAllWindows()
 
             st.success("🎉 Détection terminée !")
 
@@ -151,6 +149,5 @@ elif mode == "Vidéo":
             with open(output_path, "rb") as video_file:
                 st.video(video_file.read())
 
-            # Bouton téléchargement
             with open(output_path, "rb") as f:
                 st.download_button("📥 Télécharger la vidéo annotée", f, file_name="video_detected.mp4")
