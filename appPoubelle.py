@@ -52,7 +52,6 @@ st.markdown("""
 # ==============================
 # Charger modèle
 # ==============================
-# model_path = r"C:\Users\hp\Desktop\master2\deep learning\projetIndividuel1\runs\detect\poubelle_yolov8\weights\best.pt"
 model_path = "best.pt"
 model = YOLO(model_path)
 
@@ -114,7 +113,7 @@ elif mode == "Vidéo":
         st.markdown("<div class='box'>🎬 Vidéo originale</div>", unsafe_allow_html=True)
 
         # Sauvegarde temporaire
-        tfile = tempfile.NamedTemporaryFile(delete=False)
+        tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         tfile.write(uploaded_video.read())
 
         st.video(tfile.name)
@@ -123,7 +122,10 @@ elif mode == "Vidéo":
             with st.spinner("⏳ Analyse vidéo en cours... Cela peut prendre un moment..."):
                 
                 cap = cv2.VideoCapture(tfile.name)
-                output_path = "output_detected.mp4"
+                # Fichier temporaire pour la sortie
+                temp_output = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+                output_path = temp_output.name
+
                 fourcc = cv2.VideoWriter_fourcc(*"avc1")
                 fps = cap.get(cv2.CAP_PROP_FPS)
                 width = int(cap.get(3))
@@ -142,7 +144,6 @@ elif mode == "Vidéo":
 
                 cap.release()
                 out.release()
-              # cv2.destroyAllWindows()
 
             st.success("🎉 Détection terminée !")
 
